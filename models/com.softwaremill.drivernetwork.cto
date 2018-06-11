@@ -1,0 +1,73 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * Write your model definitions here
+ */
+
+/**
+String: a UTF8 encoded String.
+Double: a double precision 64 bit numeric value.
+Integer: a 32 bit signed whole number.
+Long: a 64 bit signed whole number.
+DateTime: an ISO-8601 compatible time instance, with optional time zone and UTZ offset.
+Boolean: a Boolean value, either true or false.
+ */
+
+namespace com.softwaremill.drivernetwork
+
+participant Driver identified by licenseId {
+  o String licenseId
+  o String firstName
+  o String lastName
+}
+
+enum LaweEnforcerType {
+  o POLICE
+  o CUSTOMS
+  o BORDER_GUARDS
+}
+
+participant LawEnforcer identified by lawEnforcerId {
+  o String lawEnforcerId
+  o LaweEnforcerType lawEnforcerType
+}
+
+participant Court identified by courtId {
+  o String courtId
+  o String description
+}
+
+asset Fine identified by fineId {
+  o String fineId
+  o Integer penaltyPoints
+  o DateTime date
+  --> Driver driver
+  --> LawEnforcer lawEnforcer
+}
+
+transaction AcceptedFine {
+  --> Fine fine
+}
+
+transaction RejectedFine {
+  --> Fine fine
+  --> Court court //todo guess court location?
+}
+
+// event SampleEvent {
+//   --> SampleAsset asset
+//   o String oldValue
+//   o String newValue
+// }
