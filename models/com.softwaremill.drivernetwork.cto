@@ -49,12 +49,25 @@ participant Court identified by courtId {
   o String description
 }
 
+enum FineState {
+  o ISSUED
+  o REJECTED
+  o ACCEPTED
+}
+
 asset Fine identified by fineId {
   o String fineId
   o Integer penaltyPoints
   o DateTime date
+  o FineState fineState default ="ISSUED"
   --> Driver driver
   --> LawEnforcer lawEnforcer
+}
+
+asset CourtCase identified by caseId {
+  o String caseId
+  --> Court court
+  --> Fine fine
 }
 
 transaction AcceptedFine {
@@ -63,7 +76,6 @@ transaction AcceptedFine {
 
 transaction RejectedFine {
   --> Fine fine
-  --> Court court //todo guess court location?
 }
 
 // event SampleEvent {
