@@ -66,7 +66,7 @@ asset Fine identified by fineId {
 
 asset CourtCase identified by caseId {
   o String caseId
-  --> Court court
+  --> Court court optional
   --> Fine fine
 }
 

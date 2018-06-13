@@ -3,7 +3,7 @@
     "composer": "^0.19.7"
   },
   "name": "driver-network",
-  "version": "0.0.7",
+  "version": "0.0.10",
   "description": "Network supporting automobile drivers",
   "scripts": {
     "prepublish": "mkdirp ./dist && composer archive create --sourceType dir --sourceName . -a ./dist/driver-network.bna",
