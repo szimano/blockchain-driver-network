@@ -31,6 +31,7 @@ participant Driver identified by licenseId {
   o String licenseId
   o String firstName
   o String lastName
+  o Boolean licenseValid default =true
 }
 
 enum LaweEnforcerType {

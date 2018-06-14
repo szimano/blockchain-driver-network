@@ -1,0 +1,6 @@
+query selectAcceptedFinesByDriver {
+  description: "Select all accepted fines for a given driver"
+  statement:
+    SELECT com.softwaremill.drivernetwork.Fine
+      WHERE (driver == _$driver AND fineState == "ACCEPTED")
+}

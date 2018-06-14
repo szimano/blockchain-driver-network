@@ -27,10 +27,12 @@ chai.should();
 chai.use(require('chai-as-promised'));
 
 const namespace = 'com.softwaremill.drivernetwork';
-const assetType = 'SampleAsset';
-const assetNS = namespace + '.' + assetType;
-const participantType = 'SampleParticipant';
-const participantNS = namespace + '.' + participantType;
+const driverType = 'Driver';
+const driverNS = namespace + '.' + driverType;
+const lawEnforcerType = 'LawEnforcer';
+const lawEnforcerNS = namespace + '.' + lawEnforcerType;
+const fineType = 'Fine';
+const fineNS = namespace + '.' + fineType;
 
 describe('#' + namespace, () => {
     // In-memory card store for testing so cards are not persisted to the file system
@@ -57,6 +59,7 @@ describe('#' + namespace, () => {
     // These are the identities for Alice and Bob.
     const aliceCardName = 'alice';
     const bobCardName = 'bob';
+    const policeCardName = 'police';
 
     // These are a list of receieved events.
     let events;
@@ -127,36 +130,36 @@ describe('#' + namespace, () => {
         // Get the factory for the business network.
         factory = businessNetworkConnection.getBusinessNetwork().getFactory();
 
-        const participantRegistry = await businessNetworkConnection.getParticipantRegistry(participantNS);
-        // Create the participants.
-        const alice = factory.newResource(namespace, participantType, 'alice@email.com');
+        const driverRegistry = await businessNetworkConnection.getParticipantRegistry(driverNS);
+        // Create the drivers.
+        const alice = factory.newResource(namespace, driverType, 'driver1');
         alice.firstName = 'Alice';
         alice.lastName = 'A';
 
-        const bob = factory.newResource(namespace, participantType, 'bob@email.com');
+        const bob = factory.newResource(namespace, driverType, 'driver2');
         bob.firstName = 'Bob';
         bob.lastName = 'B';
 
-        participantRegistry.addAll([alice, bob]);
+        driverRegistry.addAll([alice, bob]);
 
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
+        const laweEnforcerRegistry = await businessNetworkConnection.getParticipantRegistry(lawEnforcerNS);
         // Create the assets.
-        const asset1 = factory.newResource(namespace, assetType, '1');
-        asset1.owner = factory.newRelationship(namespace, participantType, 'alice@email.com');
-        asset1.value = '10';
+        const police = factory.newResource(namespace, lawEnforcerType, 'police1');
+        // asset1.owner = factory.newRelationship(namespace, participantType, 'alice@email.com');
+        police.lawEnforcerType = 'POLICE';
 
-        const asset2 = factory.newResource(namespace, assetType, '2');
-        asset2.owner = factory.newRelationship(namespace, participantType, 'bob@email.com');
-        asset2.value = '20';
-
-        assetRegistry.addAll([asset1, asset2]);
+        laweEnforcerRegistry.addAll([police]);
 
         // Issue the identities.
-        let identity = await businessNetworkConnection.issueIdentity(participantNS + '#alice@email.com', 'alice1');
+        let identity = await businessNetworkConnection.issueIdentity(driverNS + '#driver1', 'alice1');
         await importCardForIdentity(aliceCardName, identity);
-        identity = await businessNetworkConnection.issueIdentity(participantNS + '#bob@email.com', 'bob1');
+        identity = await businessNetworkConnection.issueIdentity(driverNS + '#driver2', 'bob1');
         await importCardForIdentity(bobCardName, identity);
+        identity = await businessNetworkConnection.issueIdentity(lawEnforcerNS + '#police1', 'police1');
+        await importCardForIdentity(policeCardName, identity);
     });
+
+    const uuid = ()=>([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,a=>(a^Math.random()*16>>a/4).toString(16));
 
     /**
      * Reconnect using a different identity.
@@ -173,288 +176,149 @@ describe('#' + namespace, () => {
         factory = businessNetworkConnection.getBusinessNetwork().getFactory();
     }
 
-    it('Alice can read all of the assets', async () => {
+    /**
+     * @param {Number} penaltyPoints
+     * @param {String} driverId
+     */
+    async function issueFine(penaltyPoints, driverId) {
+        const fineRegistry = await businessNetworkConnection.getAssetRegistry(fineNS);
+
+        const fine = factory.newResource(namespace, fineType, uuid());
+        fine.penaltyPoints = penaltyPoints;
+        fine.date = new Date();
+        fine.driver = factory.newRelationship(namespace, driverType, driverId);
+        fine.lawEnforcer = factory.newRelationship(namespace, lawEnforcerType, 'police1');
+
+        await fineRegistry.add(fine); 
+        
+        return fine.fineId;
+    }
+
+    /**
+     * @param {String} fineId
+     */
+    async function acceptFine(fineId) {
+        const transaction = factory.newTransaction(namespace, 'AcceptedFine');
+        transaction.fine = factory.newRelationship(namespace, fineType, fineId);
+
+        await businessNetworkConnection.submitTransaction(transaction);        
+    }
+
+    /**
+     * @param {String} fineId
+     */
+    async function rejectFine(fineId) {
+        const transaction = factory.newTransaction(namespace, 'RejectedFine');
+        transaction.fine = factory.newRelationship(namespace, fineType, fineId);
+
+        await businessNetworkConnection.submitTransaction(transaction);        
+    }
+
+    it('Police can issue a fine', async () => {
         // Use the identity for Alice.
-        await useIdentity(aliceCardName);
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        const assets = await assetRegistry.getAll();
+        await useIdentity(policeCardName);
+        
+        const fineRegistry = await businessNetworkConnection.getAssetRegistry(fineNS);        
+        let fines = await fineRegistry.getAll();
 
         // Validate the assets.
-        assets.should.have.lengthOf(2);
-        const asset1 = assets[0];
-        asset1.owner.getFullyQualifiedIdentifier().should.equal(participantNS + '#alice@email.com');
-        asset1.value.should.equal('10');
-        const asset2 = assets[1];
-        asset2.owner.getFullyQualifiedIdentifier().should.equal(participantNS + '#bob@email.com');
-        asset2.value.should.equal('20');
+        fines.should.have.lengthOf(0);
+
+        const fineId = await issueFine(10, 'driver1');
+
+        fines = await fineRegistry.getAll();
+
+        fines.should.have.lengthOf(1);
+        const fine1 = fines[0];
+        fine1.driver.getFullyQualifiedIdentifier().should.equal(driverNS + '#driver1');
+        fine1.lawEnforcer.getFullyQualifiedIdentifier().should.equal(lawEnforcerNS + '#police1');
+        fine1.penaltyPoints.should.equal(10);
     });
 
-    it('Bob can read all of the assets', async () => {
-        // Use the identity for Bob.
-        await useIdentity(bobCardName);
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        const assets = await assetRegistry.getAll();
+    it('Driver can accept a fine', async () => {
+        // given
+        await useIdentity(policeCardName);
+        const fineId = await issueFine(10, 'driver1');
 
-        // Validate the assets.
-        assets.should.have.lengthOf(2);
-        const asset1 = assets[0];
-        asset1.owner.getFullyQualifiedIdentifier().should.equal(participantNS + '#alice@email.com');
-        asset1.value.should.equal('10');
-        const asset2 = assets[1];
-        asset2.owner.getFullyQualifiedIdentifier().should.equal(participantNS + '#bob@email.com');
-        asset2.value.should.equal('20');
-    });
-
-    it('Alice can add assets that she owns', async () => {
-        // Use the identity for Alice.
+        // when
         await useIdentity(aliceCardName);
 
-        // Create the asset.
-        let asset3 = factory.newResource(namespace, assetType, '3');
-        asset3.owner = factory.newRelationship(namespace, participantType, 'alice@email.com');
-        asset3.value = '30';
+        await acceptFine(fineId);
 
-        // Add the asset, then get the asset.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        await assetRegistry.add(asset3);
+        // then
+        const fineRegistry = await businessNetworkConnection.getAssetRegistry(fineNS);
+        const fine = await fineRegistry.get(fineId);
 
-        // Validate the asset.
-        asset3 = await assetRegistry.get('3');
-        asset3.owner.getFullyQualifiedIdentifier().should.equal(participantNS + '#alice@email.com');
-        asset3.value.should.equal('30');
+        fine.fineState.should.equal('ACCEPTED');
     });
 
-    it('Alice cannot add assets that Bob owns', async () => {
-        // Use the identity for Alice.
+    it('Driver can reject a fine', async () => {
+        // given
+        await useIdentity(policeCardName);
+        const fineId = await issueFine(10, 'driver1');
+
+        // when
         await useIdentity(aliceCardName);
 
-        // Create the asset.
-        const asset3 = factory.newResource(namespace, assetType, '3');
-        asset3.owner = factory.newRelationship(namespace, participantType, 'bob@email.com');
-        asset3.value = '30';
+        await rejectFine(fineId);
 
-        // Try to add the asset, should fail.
-        const assetRegistry = await  businessNetworkConnection.getAssetRegistry(assetNS);
-        assetRegistry.add(asset3).should.be.rejectedWith(/does not have .* access to resource/);
+        // then
+        const fineRegistry = await businessNetworkConnection.getAssetRegistry(fineNS);
+        const fine = await fineRegistry.get(fineId);
+
+        fine.fineState.should.equal('REJECTED');
     });
 
-    it('Bob can add assets that he owns', async () => {
-        // Use the identity for Bob.
-        await useIdentity(bobCardName);
+    it('Drivers license should be invalidated when exceeding 21 points', async () => {
+        // given
+        await useIdentity(policeCardName);
+        const fineId = await issueFine(25, 'driver1');
 
-        // Create the asset.
-        let asset4 = factory.newResource(namespace, assetType, '4');
-        asset4.owner = factory.newRelationship(namespace, participantType, 'bob@email.com');
-        asset4.value = '40';
-
-        // Add the asset, then get the asset.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        await assetRegistry.add(asset4);
-
-        // Validate the asset.
-        asset4 = await assetRegistry.get('4');
-        asset4.owner.getFullyQualifiedIdentifier().should.equal(participantNS + '#bob@email.com');
-        asset4.value.should.equal('40');
-    });
-
-    it('Bob cannot add assets that Alice owns', async () => {
-        // Use the identity for Bob.
-        await useIdentity(bobCardName);
-
-        // Create the asset.
-        const asset4 = factory.newResource(namespace, assetType, '4');
-        asset4.owner = factory.newRelationship(namespace, participantType, 'alice@email.com');
-        asset4.value = '40';
-
-        // Try to add the asset, should fail.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        assetRegistry.add(asset4).should.be.rejectedWith(/does not have .* access to resource/);
-
-    });
-
-    it('Alice can update her assets', async () => {
-        // Use the identity for Alice.
+        // when
         await useIdentity(aliceCardName);
 
-        // Create the asset.
-        let asset1 = factory.newResource(namespace, assetType, '1');
-        asset1.owner = factory.newRelationship(namespace, participantType, 'alice@email.com');
-        asset1.value = '50';
+        await acceptFine(fineId);
 
-        // Update the asset, then get the asset.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        await assetRegistry.update(asset1);
+        // then
+        const driverRegistry = await businessNetworkConnection.getParticipantRegistry(driverNS);
+        const driver = await driverRegistry.get('driver1');
 
-        // Validate the asset.
-        asset1 = await assetRegistry.get('1');
-        asset1.owner.getFullyQualifiedIdentifier().should.equal(participantNS + '#alice@email.com');
-        asset1.value.should.equal('50');
+        driver.licenseValid.should.equal(false);
     });
+ 
+    it('Drivers license should be invalidated when exceeding 21 points from multiple fines', async () => {
+        // given
+        await useIdentity(policeCardName);
+        const fineId1 = await issueFine(10, 'driver1');
+        const fineId2 = await issueFine(7, 'driver1');
+        const fineId3 = await issueFine(5, 'driver1');
 
-    it('Alice cannot update Bob\'s assets', async () => {
-        // Use the identity for Alice.
+        // when
         await useIdentity(aliceCardName);
 
-        // Create the asset.
-        const asset2 = factory.newResource(namespace, assetType, '2');
-        asset2.owner = factory.newRelationship(namespace, participantType, 'bob@email.com');
-        asset2.value = '50';
+        await acceptFine(fineId1);
 
-        // Try to update the asset, should fail.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        assetRegistry.update(asset2).should.be.rejectedWith(/does not have .* access to resource/);
-    });
+        // then
+        const driverRegistry = await businessNetworkConnection.getParticipantRegistry(driverNS);
+        let driver = await driverRegistry.get('driver1');
 
-    it('Bob can update his assets', async () => {
-        // Use the identity for Bob.
-        await useIdentity(bobCardName);
+        driver.licenseValid.should.equal(true);
 
-        // Create the asset.
-        let asset2 = factory.newResource(namespace, assetType, '2');
-        asset2.owner = factory.newRelationship(namespace, participantType, 'bob@email.com');
-        asset2.value = '60';
+        // and
+        await acceptFine(fineId2);
 
-        // Update the asset, then get the asset.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        await assetRegistry.update(asset2);
+        // then
+        driver = await driverRegistry.get('driver1');
 
-        // Validate the asset.
-        asset2 = await assetRegistry.get('2');
-        asset2.owner.getFullyQualifiedIdentifier().should.equal(participantNS + '#bob@email.com');
-        asset2.value.should.equal('60');
-    });
+        driver.licenseValid.should.equal(true);
 
-    it('Bob cannot update Alice\'s assets', async () => {
-        // Use the identity for Bob.
-        await useIdentity(bobCardName);
+        // and
+        await acceptFine(fineId3);
 
-        // Create the asset.
-        const asset1 = factory.newResource(namespace, assetType, '1');
-        asset1.owner = factory.newRelationship(namespace, participantType, 'alice@email.com');
-        asset1.value = '60';
+        // then
+        driver = await driverRegistry.get('driver1');
 
-        // Update the asset, then get the asset.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        assetRegistry.update(asset1).should.be.rejectedWith(/does not have .* access to resource/);
-
-    });
-
-    it('Alice can remove her assets', async () => {
-        // Use the identity for Alice.
-        await useIdentity(aliceCardName);
-
-        // Remove the asset, then test the asset exists.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        await assetRegistry.remove('1');
-        const exists = await assetRegistry.exists('1');
-        exists.should.be.false;
-    });
-
-    it('Alice cannot remove Bob\'s assets', async () => {
-        // Use the identity for Alice.
-        await useIdentity(aliceCardName);
-
-        // Remove the asset, then test the asset exists.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        assetRegistry.remove('2').should.be.rejectedWith(/does not have .* access to resource/);
-    });
-
-    it('Bob can remove his assets', async () => {
-        // Use the identity for Bob.
-        await useIdentity(bobCardName);
-
-        // Remove the asset, then test the asset exists.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        await assetRegistry.remove('2');
-        const exists = await assetRegistry.exists('2');
-        exists.should.be.false;
-    });
-
-    it('Bob cannot remove Alice\'s assets', async () => {
-        // Use the identity for Bob.
-        await useIdentity(bobCardName);
-
-        // Remove the asset, then test the asset exists.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        assetRegistry.remove('1').should.be.rejectedWith(/does not have .* access to resource/);
-    });
-
-    it('Alice can submit a transaction for her assets', async () => {
-        // Use the identity for Alice.
-        await useIdentity(aliceCardName);
-
-        // Submit the transaction.
-        const transaction = factory.newTransaction(namespace, 'SampleTransaction');
-        transaction.asset = factory.newRelationship(namespace, assetType, '1');
-        transaction.newValue = '50';
-        await businessNetworkConnection.submitTransaction(transaction);
-
-        // Get the asset.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        const asset1 = await assetRegistry.get('1');
-
-        // Validate the asset.
-        asset1.owner.getFullyQualifiedIdentifier().should.equal(participantNS + '#alice@email.com');
-        asset1.value.should.equal('50');
-
-        // Validate the events.
-        events.should.have.lengthOf(1);
-        const event = events[0];
-        event.eventId.should.be.a('string');
-        event.timestamp.should.be.an.instanceOf(Date);
-        event.asset.getFullyQualifiedIdentifier().should.equal(assetNS + '#1');
-        event.oldValue.should.equal('10');
-        event.newValue.should.equal('50');
-    });
-
-    it('Alice cannot submit a transaction for Bob\'s assets', async () => {
-        // Use the identity for Alice.
-        await useIdentity(aliceCardName);
-
-        // Submit the transaction.
-        const transaction = factory.newTransaction(namespace, 'SampleTransaction');
-        transaction.asset = factory.newRelationship(namespace, assetType, '2');
-        transaction.newValue = '50';
-        businessNetworkConnection.submitTransaction(transaction).should.be.rejectedWith(/does not have .* access to resource/);
-    });
-
-    it('Bob can submit a transaction for his assets', async () => {
-        // Use the identity for Bob.
-        await useIdentity(bobCardName);
-
-        // Submit the transaction.
-        const transaction = factory.newTransaction(namespace, 'SampleTransaction');
-        transaction.asset = factory.newRelationship(namespace, assetType, '2');
-        transaction.newValue = '60';
-        await businessNetworkConnection.submitTransaction(transaction);
-
-        // Get the asset.
-        const assetRegistry = await businessNetworkConnection.getAssetRegistry(assetNS);
-        const asset2 = await assetRegistry.get('2');
-
-        // Validate the asset.
-        asset2.owner.getFullyQualifiedIdentifier().should.equal(participantNS + '#bob@email.com');
-        asset2.value.should.equal('60');
-
-        // Validate the events.
-        events.should.have.lengthOf(1);
-        const event = events[0];
-        event.eventId.should.be.a('string');
-        event.timestamp.should.be.an.instanceOf(Date);
-        event.asset.getFullyQualifiedIdentifier().should.equal(assetNS + '#2');
-        event.oldValue.should.equal('20');
-        event.newValue.should.equal('60');
-    });
-
-    it('Bob cannot submit a transaction for Alice\'s assets', async () => {
-        // Use the identity for Bob.
-        await useIdentity(bobCardName);
-
-        // Submit the transaction.
-        const transaction = factory.newTransaction(namespace, 'SampleTransaction');
-        transaction.asset = factory.newRelationship(namespace, assetType, '1');
-        transaction.newValue = '60';
-        businessNetworkConnection.submitTransaction(transaction).should.be.rejectedWith(/does not have .* access to resource/);
+        driver.licenseValid.should.equal(false);
     });
 
 });

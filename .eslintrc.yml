@@ -14,6 +14,7 @@ globals:
     getCurrentParticipant: true
     post: true
     emit: true
+    query: true
 rules:
     indent:
         - error
@@ -37,7 +38,7 @@ rules:
     strict: error
     dot-notation: error
     no-tabs: error
-    no-trailing-spaces: error
+    no-trailing-spaces: off
     no-useless-call: error
     no-with: error
     operator-linebreak: error
