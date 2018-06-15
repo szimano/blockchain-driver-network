@@ -180,7 +180,7 @@ describe('#' + namespace, () => {
      * @param {Number} penaltyPoints
      * @param {String} driverId
      */
-    async function issueFine(penaltyPoints, driverId) {
+    async function issueFine(penaltyPoints, driverId, shouldRejectReason = null) {
         const fineRegistry = await businessNetworkConnection.getAssetRegistry(fineNS);
 
         const fine = factory.newResource(namespace, fineType, uuid());
@@ -189,29 +189,41 @@ describe('#' + namespace, () => {
         fine.driver = factory.newRelationship(namespace, driverType, driverId);
         fine.lawEnforcer = factory.newRelationship(namespace, lawEnforcerType, 'police1');
 
-        await fineRegistry.add(fine); 
+        if (shouldRejectReason) {
+            fineRegistry.add(fine).should.be.rejectedWith(shouldRejectReason);
+        } else {
+            await fineRegistry.add(fine); 
         
-        return fine.fineId;
+            return fine.fineId;
+        }
     }
 
     /**
      * @param {String} fineId
      */
-    async function acceptFine(fineId) {
+    async function acceptFine(fineId, shouldRejectReason = null) {
         const transaction = factory.newTransaction(namespace, 'AcceptedFine');
         transaction.fine = factory.newRelationship(namespace, fineType, fineId);
 
-        await businessNetworkConnection.submitTransaction(transaction);        
+        if (shouldRejectReason) {
+            businessNetworkConnection.submitTransaction(transaction).should.be.rejectedWith(shouldRejectReason);    
+        } else {
+            await businessNetworkConnection.submitTransaction(transaction);       
+        } 
     }
 
     /**
      * @param {String} fineId
      */
-    async function rejectFine(fineId) {
+    async function rejectFine(fineId, shouldRejectReason = null) {
         const transaction = factory.newTransaction(namespace, 'RejectedFine');
         transaction.fine = factory.newRelationship(namespace, fineType, fineId);
 
-        await businessNetworkConnection.submitTransaction(transaction);        
+        if (shouldRejectReason) {
+            businessNetworkConnection.submitTransaction(transaction).should.be.rejectedWith(shouldRejectReason);
+        } else {
+            await businessNetworkConnection.submitTransaction(transaction);
+        }        
     }
 
     it('Police can issue a fine', async () => {
@@ -233,6 +245,22 @@ describe('#' + namespace, () => {
         fine1.driver.getFullyQualifiedIdentifier().should.equal(driverNS + '#driver1');
         fine1.lawEnforcer.getFullyQualifiedIdentifier().should.equal(lawEnforcerNS + '#police1');
         fine1.penaltyPoints.should.equal(10);
+    });
+
+    it('Driver cannot issue a fine', async () => {
+        // given
+        await useIdentity(aliceCardName);
+
+        // when
+        const fineRegistry = await businessNetworkConnection.getAssetRegistry(fineNS);
+        const fine = factory.newResource(namespace, fineType, uuid());
+        fine.penaltyPoints = 10;
+        fine.date = new Date();
+        fine.driver = factory.newRelationship(namespace, driverType, 'driver1');
+        fine.lawEnforcer = factory.newRelationship(namespace, lawEnforcerType, 'police1');
+
+        // then
+        fineRegistry.add(fine).should.be.rejectedWith(/does not have .* access to resource/);
     });
 
     it('Driver can accept a fine', async () => {

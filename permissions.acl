@@ -14,70 +14,120 @@
 
 
 // for now allow everything
-rule Default {
-    description: "Allow all participants access to all resources"
-    participant: "ANY"
-    operation: ALL
-    resource: "com.softwaremill.drivernetwork.*"
-    action: ALLOW
-}
-
-rule SystemACL {
-  description:  "System ACL to permit all access"
-  participant: "ANY"
-  operation: ALL
-  resource: "org.hyperledger.composer.system.**"
-  action: ALLOW
-}
-
-/**
- * Sample access control list.
- */
-// rule EverybodyCanReadEverything {
-//     description: "Allow all participants read access to all resources"
-//     participant: "com.softwaremill.drivernetwork.SampleParticipant"
-//     operation: READ
-//     resource: "com.softwaremill.drivernetwork.*"
-//     action: ALLOW
-// }
-
-// rule EverybodyCanSubmitTransactions {
-//     description: "Allow all participants to submit transactions"
-//     participant: "com.softwaremill.drivernetwork.SampleParticipant"
-//     operation: CREATE
-//     resource: "com.softwaremill.drivernetwork.SampleTransaction"
-//     action: ALLOW
-// }
-
-// rule OwnerHasFullAccessToTheirAssets {
-//     description: "Allow all participants full access to their assets"
-//     participant(p): "com.softwaremill.drivernetwork.SampleParticipant"
+// rule Default {
+//     description: "Allow all participants access to all resources"
+//     participant: "ANY"
 //     operation: ALL
-//     resource(r): "com.softwaremill.drivernetwork.SampleAsset"
-//     condition: (r.owner.getIdentifier() === p.getIdentifier())
+//     resource: "com.softwaremill.drivernetwork.*"
 //     action: ALLOW
 // }
 
 // rule SystemACL {
 //   description:  "System ACL to permit all access"
-//   participant: "org.hyperledger.composer.system.Participant"
+//   participant: "ANY"
 //   operation: ALL
 //   resource: "org.hyperledger.composer.system.**"
 //   action: ALLOW
 // }
 
-// rule NetworkAdminUser {
-//     description: "Grant business network administrators full access to user resources"
-//     participant: "org.hyperledger.composer.system.NetworkAdmin"
-//     operation: ALL
-//     resource: "**"
-//     action: ALLOW
-// }
+rule LawCanReadEverything {
+  description: "Law Enforcers can access all resources"
+  participant: "com.softwaremill.drivernetwork.LawEnforcer"
+  operation: READ
+  resource: "com.softwaremill.drivernetwork.*"
+  action: ALLOW
+}
 
-// rule NetworkAdminSystem {
-//     description: "Grant business network administrators full access to system resources"
-//     participant: "org.hyperledger.composer.system.NetworkAdmin"
-//     operation: ALL
-//     resource: "org.hyperledger.composer.system.**"
-//     action: ALLOW
-// }
+rule LawCanCURDFines {
+  description: "Law Enforcers can issue/modify/delete fines"
+  participant: "com.softwaremill.drivernetwork.LawEnforcer"
+  operation: ALL
+  resource: "com.softwaremill.drivernetwork.Fine"
+  action: ALLOW
+}
+
+rule CourtCanCURDFines {
+  description: "Law Enforcers can issue/modify/delete fines"
+  participant: "com.softwaremill.drivernetwork.Court"
+  operation: ALL
+  resource: "com.softwaremill.drivernetwork.Fine"
+  action: ALLOW
+}
+
+rule CourtCanReadEverything {
+  description: "Law Enforcers can access all resources"
+  participant: "com.softwaremill.drivernetwork.Court"
+  operation: READ
+  resource: "com.softwaremill.drivernetwork.*"
+  action: ALLOW
+}
+
+rule DriverCanReadOwn {
+  description: "Driver can read own fines"
+  participant(p): "com.softwaremill.drivernetwork.Driver"
+  operation: ALL //todo - driver should not be able to simply update own fines?
+  resource(r): "com.softwaremill.drivernetwork.Fine"
+  condition: (r.driver.getIdentifier() === p.getIdentifier())
+  action: ALLOW
+}
+
+
+rule DriverCanReadItself {
+  description: "Driver can read himself"
+  participant(p): "com.softwaremill.drivernetwork.Driver"
+  operation: ALL
+  resource(r): "com.softwaremill.drivernetwork.Driver"
+  condition: (r.getIdentifier() === p.getIdentifier())
+  action: ALLOW
+}
+
+rule DriverCanAcceptOwnFines {
+  description: "Driver can accept own fines"
+  participant(p): "com.softwaremill.drivernetwork.Driver"
+  operation: CREATE, READ
+  resource(r): "com.softwaremill.drivernetwork.AcceptedFine"
+  condition: (r.fine.driver.getIdentifier() === p.getIdentifier())
+  action: ALLOW
+}
+
+rule DriverCanRejectOwnFines {
+  description: "Driver can reject own fines"
+  participant(p): "com.softwaremill.drivernetwork.Driver"
+  operation: CREATE, READ
+  resource(r): "com.softwaremill.drivernetwork.RejectedFine"
+  condition: (r.fine.driver.getIdentifier() === p.getIdentifier())
+  action: ALLOW
+}
+
+rule DriverCanCreateCourtCase {
+  description: "Driver can send it's fine to court"
+  participant(p): "com.softwaremill.drivernetwork.Driver"
+  operation: CREATE, READ
+  resource(r): "com.softwaremill.drivernetwork.CourtCase"
+  condition: (r.fine.driver.getIdentifier() === p.getIdentifier())
+  action: ALLOW
+}
+
+rule SystemACL {
+  description:  "System ACL to permit all access"
+  participant: "org.hyperledger.composer.system.Participant"
+  operation: ALL
+  resource: "org.hyperledger.composer.system.**"
+  action: ALLOW
+}
+
+rule NetworkAdminUser {
+    description: "Grant business network administrators full access to user resources"
+    participant: "org.hyperledger.composer.system.NetworkAdmin"
+    operation: ALL
+    resource: "**"
+    action: ALLOW
+}
+
+rule NetworkAdminSystem {
+    description: "Grant business network administrators full access to system resources"
+    participant: "org.hyperledger.composer.system.NetworkAdmin"
+    operation: ALL
+    resource: "org.hyperledger.composer.system.**"
+    action: ALLOW
+}
