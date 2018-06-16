@@ -260,7 +260,9 @@ describe('#' + namespace, () => {
         fine.lawEnforcer = factory.newRelationship(namespace, lawEnforcerType, 'police1');
 
         // then
-        fineRegistry.add(fine).should.be.rejectedWith(/does not have .* access to resource/);
+        // fineRegistry.add(fine).should.be.rejectedWith(/does not have .* access to resource/);
+        const fineResp = fineRegistry.add(fine);
+        return fineResp.should.be.rejected;
     });
 
     it('Driver can accept a fine', async () => {
