@@ -262,7 +262,27 @@ describe('#' + namespace, () => {
         // then
         // fineRegistry.add(fine).should.be.rejectedWith(/does not have .* access to resource/);
         const fineResp = fineRegistry.add(fine);
-        return fineResp.should.be.rejected;
+        return fineResp.should.be.rejectedWith(/does not have .* access to resource/);
+    });
+
+
+    it('Driver cannot update own fine', async () => {
+        // given
+        await useIdentity(policeCardName);
+
+        const fineId = await issueFine(10, 'driver1');
+
+        // when
+        await useIdentity(aliceCardName);
+
+        const fineRegistry = await businessNetworkConnection.getAssetRegistry(fineNS);
+        let fine = await fineRegistry.get(fineId);
+
+        fine.penaltyPoints = 1;
+
+        // then
+        const fineResp = fineRegistry.update(fine);
+        return fineResp.should.be.rejectedWith(/does not have .* access to resource/);
     });
 
     it('Driver can accept a fine', async () => {

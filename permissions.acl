@@ -38,7 +38,7 @@ rule LawCanReadEverything {
   action: ALLOW
 }
 
-rule LawCanCURDFines {
+rule LawCanCRUDFines {
   description: "Law Enforcers can issue/modify/delete fines"
   participant: "com.softwaremill.drivernetwork.LawEnforcer"
   operation: ALL
@@ -46,7 +46,7 @@ rule LawCanCURDFines {
   action: ALLOW
 }
 
-rule CourtCanCURDFines {
+rule CourtCanCRUDFines {
   description: "Law Enforcers can issue/modify/delete fines"
   participant: "com.softwaremill.drivernetwork.Court"
   operation: ALL
@@ -65,18 +65,47 @@ rule CourtCanReadEverything {
 rule DriverCanReadOwn {
   description: "Driver can read own fines"
   participant(p): "com.softwaremill.drivernetwork.Driver"
-  operation: ALL //todo - driver should not be able to simply update own fines?
+  operation: READ
   resource(r): "com.softwaremill.drivernetwork.Fine"
   condition: (r.driver.getIdentifier() === p.getIdentifier())
   action: ALLOW
 }
 
+rule DriverCanUpdateOwnFinesUsingRejected {
+  description: "Driver can read own fines"
+  participant(p): "com.softwaremill.drivernetwork.Driver"
+  operation: UPDATE
+  resource(r): "com.softwaremill.drivernetwork.Fine"
+  transaction: "com.softwaremill.drivernetwork.RejectedFine"
+  condition: (r.driver.getIdentifier() === p.getIdentifier())
+  action: ALLOW
+}
+
+rule DriverCanUpdateOwnFinesUsingAccepted {
+  description: "Driver can read own fines"
+  participant(p): "com.softwaremill.drivernetwork.Driver"
+  operation: UPDATE
+  resource(r): "com.softwaremill.drivernetwork.Fine"
+  transaction: "com.softwaremill.drivernetwork.AcceptedFine"
+  condition: (r.driver.getIdentifier() === p.getIdentifier())
+  action: ALLOW
+}
 
 rule DriverCanReadItself {
   description: "Driver can read himself"
   participant(p): "com.softwaremill.drivernetwork.Driver"
-  operation: ALL
+  operation: READ
   resource(r): "com.softwaremill.drivernetwork.Driver"
+  condition: (r.getIdentifier() === p.getIdentifier())
+  action: ALLOW
+}
+
+rule DriverCanUpdateItselfUsingAccepted {
+  description: "Driver can read own fines"
+  participant(p): "com.softwaremill.drivernetwork.Driver"
+  operation: UPDATE
+  resource(r): "com.softwaremill.drivernetwork.Driver"
+  transaction: "com.softwaremill.drivernetwork.AcceptedFine"
   condition: (r.getIdentifier() === p.getIdentifier())
   action: ALLOW
 }
